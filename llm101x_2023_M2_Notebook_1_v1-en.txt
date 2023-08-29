@@ -1,0 +1,146 @@
+In this LM02 notebook, we'll be looking at how we can convert text into embedding vectors,
+saved these vectors into a database, and then conduct search on top.
+There are two different vector store solutions that we'll be exploring in this notebook:
+the first is FAISS, which is a vector library and second is ChromaDB, open sourced vector database.
+By now, you should be pretty familiar with this search and
+retrieval workflow that consists of two different components. The
+first is the search step and the second is the retrieval-augmented generation step.
+And both of those steps are contingent upon having some knowledge space to start from.
+Without further ado, let's look at the code. We are going to first install a few dependencies for
+your notebook to run successfully throughout. So go ahead and run your CMD3 and CMD5.
+I'm using the keyboard shortcut shift+enter to run each of the cells over here.
+And you may also notice that they take a little bit of time to set up,
+so feel free to pause this video and then return to this when you are ready.
+Now I can see that my classroom setup cell has finished running. We can go
+ahead and proceed with the rest of the notebook.
+First, we'll start off by looking at the data that we'll be using. It is this data set called News
+Topics collected by the NewsCatcher team. If you are curious what this NewsCatcher team does,
+you can go to their website and read a little bit more about how they actually scraped the data.
+Now let's look at what the data set actually looks like.
+So notice that we are reading from DA.paths.dataset. If this cell does return you
+any error, due to this path, just know that you can easily fix it by going to the classroom setup
+cell over here and run it, which instantiates all of the environment variables that starts with DA.
+So in this result over here, we can see that this data set consists of over
+8,000 rows and each row over here tells us a little bit more about each news article,
+ranging from the topic of the news, where it's scraped from, when was it published,
+the title of the news article, the language and also the ID for each news article.
+So this ID over here will come in handy later on as we convert each of the rows over
+here into a single vector. So we will also call this as a vector ID later on as well.
+Now let's look at FAISS. So we mentioned in the lecture that FAISS5 is a vector
+library and it's a library that conducts approximate nearest neighbor search.
+As a quick recap, approximate nearest neighbor search is often preferable to
+brute-force search because it allows you to find the right balance between the recall trade-off,
+the latency, the throughput and also the time to find the top-K nearest neighbors as well.
+FAISS has a pretty good documentation page on their GitHub repo so I highly recommend you
+checking it out if you want to learn more about FAISS. If you scroll over all the way to the top,
+you will recognize that, on the right hand side of this page over here, there are lots of sections
+that contains information on how to get started, how to use lower memory, how to run this on gpus,
+the different metrics, and also the different indexing algorithms that FAISShas implemented.
+There is also a best practice guide published by FAISS as well under the same GitHub repo.
+Now let's briefly look at the overall workflow of FAISS. So you can see that the workflow is
+color-coded into different components. The first is when we actually encode the data or
+the documents into embedding vectors, so you will see that for each text document that you have,
+we pass it through an encoder, which vectorizes your text, which means that it's converting
+your text into embedding vectors, and then store it in FAISS. Remember that FAISS is
+a vector library and it stores every document or the data that you have into a vector index.
+So the vector index, don't confuse it with a vector ID, that we mentioned above over here,
+where each document can have its own ID. So vector index, that we're referring to over here,
+is a data structure that holds all metadata that allows you to conduct efficient vector search.
+And FAISS stores all of this index in memory or you can also call it on RAM. So later on,
+you will realize that with FAISS, it's really lightweight and easy to use. You actually don't
+need to pass in any database configuration because there's no database involved. So the second
+component of this workflow is after you have the data stored in the vector index, the users can now
+pass in their search queries and similarly, the search queries will also be passed into an encoder
+that vectorizes the queries into a vector. And then, we can apply some search algorithm on top
+to return us the relevant results. So this is what FAISS does under the hood, where we called FAISS.
+Now let's look at the following cell, CMD10 over here. We'll be using a library called Sentence
+Transformer. Sentence Transformer is a Python framework for state-of-the-art sentence text
+and even image embeddings. We'll only be using the first thousand rows of the news data set to
+speed up the rest of the notebook execution. What this function does is to simply convert
+the input text into a data structure that's accepted by Sentence Transformer,
+which is known as the Input Example. If you are curious what the FAISS trained examples look like,
+we can easily take a look now. And then now we are going to just look at what
+train examples look like, which is a list of input examples.
+The next step is to vectorize text into embedding vectors so this is actually where
+we are going to call encoder to transform all of our attacks into embedding vectors. So you can see
+that we are using the model this particular model from Sentence Transformer. We're caching this
+model to a cache folder and then we're applying an encoder on top of the documents to transform
+this text into vectors and then now we are going to check the dimension of the vectors over here.
+So you can see that we expected there will be
+10,000, sorry 1000 rows altogether because we are only looking at the top thousand
+news articles and then each vector has 384 dimension as the embedding vector.
+So now, let's look at the third step over here. This is actually where bulk of the work
+is actually happening. So you'll see that finally we are passing those vectors to FAISS where FAISS
+actually does the indexing for us. So let's look at this line-by-line so you can see that from this
+data set that we have over here we're actually collecting all of the vector IDs into an array
+and the vector IDs refer to the ID that corresponds to each news article. So you
+will realize that this pandas index that we are getting, we are using that as the ID column
+and then all of the IDs is now stored in an array. So this ID index over here is an array that has
+all of the vector IDs and the next thing that we will do is to actually normalize these vectors.
+But why do we actually normalize these vectors? So generally whether you normalize embedding
+vectors or not doesn't really matter because the magnitude of each embedding really doesn't
+make a difference. But just know that when you normalize these vectors, it doesn't really change
+the ranking of the results. But in this context, we can normalize it to unit length so that the dot
+product, that we'll go into a little bit more later on, will be equal to cosine similarity.
+Now let's look at the following line over here. Line 12 contains two APIs that can look quite
+foreign to you. So just know that when you see index over here, it really just refers to the
+files index, which is the vector index that stores the data structure that contains all the metadata
+to help you search for vectors. So let's look at this first API call over here first and within
+this API call you will see that we are passing in the dimension of our embedding vector and
+this index that we are using is called Flat IP so let's look at IP first what does IP actually
+stand for? So IP stands for inner product, which means that by calling this API, we're actually
+maximizing the inner product between the query and also between the items retrieved. The reason why
+it is called "Flat" is because FAISS is actually storing all the vectors without any compression.
+So it means that the storage size is the same as that of the original data set. But there are
+also other indexing algorithms implemented by FAISS that actually has vector compression. But
+when you see "Flat", you should know that this indicates no vector compression is involved.
+And in fact, IndexFlatIP is quite a common choice for as a baseline algorithm to evaluate
+vector search results, because there is no vector compression. Then we can compare easily
+the results of the search with another indexing algorithm that actually has vector compression.
+So as a quick recap, FAISS has many, many indexing algorithms and each Index
+subclass over here implements its own indexing structure. And in this case,
+we are using an inner product algorithm where we don't have any vector compression involved
+You will also notice that in this "IndexFlatIP",
+it doesn't require any parameters, like whether you want to include product quantization or to
+customize your distance metrics because this is pretty self-explanatory that we are using inner
+product over here as the metric. And there's no training involved in this IndexFlatIP.
+Now before I go into talking about what IndexIDMap actually does, let's first motivate by looking at
+what results we will get by just running the code up to the point of IndexFlatIP.
+So I'm going to copy this code up here,
+put it in a different cell, and I'm actually also going to grab this line over here and
+then name it as index_flat. And you will see that this runs just fine. It runs successfully.
+Now I actually have my index structure that holds all the metadata between the vectors.
+And now I'm also going to reuse this line.
+And I'll explain a little bit more what this line actually does later on.
+So you will see that the error that we're getting over here says that this
+particular type of index doesn't actually have this function or method implemented,
+called add_with_ids. So what add_with_ids does? It just means that we are copying the index
+structure over here to the internal storage of the index and there is absolutely no processing
+involved into the vectors. But you can notice that this takes in two different arguments:
+the first is the actual vectors themselves and the second is the array of vector IDs that we
+actually collected in the beginning, where you see line 5 over here, where all this is the array of
+vector IDs corresponding to each document or the news article that we have in the data. So this
+brings us to the reason why we actually need this intermediate API call, called IndexIDMap.
+IndexIDMap is merely a function to maintain a mapping between your vectors and also your
+vector IDs so this means that now that we're able to provide a mapping between the IDs and
+also the corresponding vectors. We actually don't have to use sequential indexes so if
+we were to remove any vectors there the vector IDs actually wouldn't be shifted.
+So now let's run this cell and you will see that by having this IndexIDMap, indeed our code is
+running just fine without any errors. So now we have just implemented the workflow of converting
+our data into data vectors and then saving all of this in a vector index, facilitated by FAISS.
+Now let's look at the following component which is search. Notice that in line 2 and line 3 over
+here, we're also passing our queries to the encoder and normalize the embedding vectors
+as well. So just know that it's very important for you to apply the same pre-processing steps
+to both your documents and also your queries. So this is important to make sure that you're the
+embedding space generated is the same for both and then you will actually get relevant results later.
+And the following lines over here is just implementing functions to help you search
+for the top-K nearest neighbors. So let's go ahead and run this cell.
+And then now finally we can actually pass in any text that we want to search for
+and then return the relevant documents. So you can see that here we can verify
+the types of documents that are being returned. And indeed, we are seeing news articles related
+to animals such as about cats, about animals and infectious diseases, and about dog petting.
+S far, what we have done is simply retrieving relevant context to our
+queries but we haven't used a language model to help us generate any new output or new text.
+In the next section, we are going to take this one step further
+and incorporate a language model together with ChromaDB and look at
+how we can actually use these retrieval results to augment the text generation
