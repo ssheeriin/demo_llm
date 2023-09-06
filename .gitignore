@@ -1,3 +1,4 @@
 cache/*
 vdb/*
 .DS_Store
+.idea
