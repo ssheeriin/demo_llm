@@ -2,3 +2,4 @@ cache/*
 vdb/*
 .DS_Store
 .idea
+crse_fastai_dl_ai/bird_or_not
